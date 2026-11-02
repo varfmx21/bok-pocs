@@ -1,0 +1,18 @@
+CREATE DATABASE IF NOT EXISTS `login`
+    DEFAULT CHARACTER SET utf8
+    COLLATE utf8_general_ci;
+
+USE `login`;
+
+CREATE TABLE IF NOT EXISTS accounts (
+    id INT NOT NULL AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    salt VARBINARY(16) NOT NULL,
+    pepper_version INT NOT NULL,
+    argon2_params JSON NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB
+  AUTO_INCREMENT=2
+  DEFAULT CHARSET=utf8;
