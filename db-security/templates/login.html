@@ -12,13 +12,37 @@
         <h2 class="word">Login</h2>
         
         <form action="{{ url_for('login') }}" method="post">
-            <div>{{ msg }}</div>
+            {% if msg %}
+            <div class="msg">{{ msg }}</div>
+            {% endif %}
 
             <input class="textbox" type="text" name="username" placeholder="Enter Username" required>
             <input class="textbox" type="password" name="password" placeholder="Enter Password" required>
             
             <button class="btn" type="submit">Login</button>
         </form>
+
+        {% if account %}
+        <div class="account-card" style="margin-top: 20px; text-align: left;">
+            <h3 class="card-title">User Details</h3>
+            <div class="info-row">
+                <span class="info-label">Username:</span>
+                <span class="info-value">{{ account.username }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Email:</span>
+                <span class="info-value">{{ account.email }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">National ID:</span>
+                <span class="info-value">{{ account.national_id }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Phone:</span>
+                <span class="info-value">{{ account.phone }}</span>
+            </div>
+        </div>
+        {% endif %}
 
         <p class="bottom">Don't have an account? <a href="{{ url_for('register') }}">Register here</a></p>
     </div>

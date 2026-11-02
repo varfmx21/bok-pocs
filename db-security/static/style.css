@@ -5,8 +5,10 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    min-height: 100vh;
     margin: 0;
+    padding: 20px 0;
+    box-sizing: border-box;
 }
 
 .container {
@@ -15,29 +17,34 @@ body {
     border-radius: 10px;
     box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
     text-align: center;
-    width: 350px;
+    width: 380px;
+    max-width: 90%;
+    box-sizing: border-box;
 }
 
-h1 {
+h1, h2 {
     color: #FFFFFF;
     font-style: oblique;
     font-weight: bold;
     background-color: #236B8E;
     padding: 10px;
     border-radius: 5px;
+    margin-top: 0;
 }
 
 /* Input fields */
-input[type="text"], input[type="password"], input[type="email"] {
-    width: 90%;
+input[type="text"], input[type="password"], input[type="email"], input[type="tel"], input[type="date"], .textbox {
+    width: 95%;
     padding: 12px;
-    margin: 10px 0;
+    margin: 8px 0;
     border: none;
     border-radius: 5px;
     background-color: #F0F8FF;
     text-align: center;
     font-weight: bold;
     font-style: oblique;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
 }
 
 /* Placeholder text styling */
@@ -48,7 +55,7 @@ input[type="text"], input[type="password"], input[type="email"] {
 }
 
 /* Button styling */
-button {
+button, .btn {
     width: 95%;
     padding: 12px;
     background-color: #236B8E;
@@ -59,10 +66,80 @@ button {
     font-style: oblique;
     cursor: pointer;
     margin-top: 10px;
+    font-size: 1rem;
+    box-sizing: border-box;
 }
 
-button:hover {
+button:hover, .btn:hover {
     background-color: #1E5A7B;
+}
+
+/* Account card for displaying logged in user information */
+.account-card {
+    background-color: #236B8E;
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin: 15px 0;
+    text-align: left;
+    color: #FFFFFF;
+}
+
+.card-title {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 1.1em;
+    border-bottom: 1px solid #9AC0CD;
+    padding-bottom: 5px;
+    color: #FFFFFF;
+    text-align: center;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 8px 0;
+    font-size: 0.95em;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
+    padding-bottom: 4px;
+}
+
+.info-label {
+    font-weight: bold;
+    color: #E0EEEE;
+}
+
+.info-value {
+    color: #FFFFFF;
+    word-break: break-all;
+}
+
+.btn-logout {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #236B8E;
+    color: white;
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.btn-logout:hover {
+    background-color: #1E5A7B;
+}
+
+.msg {
+    color: #8B0000;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.msg-success {
+    color: #004d00;
+    background-color: #d4edda;
+    padding: 8px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    font-weight: bold;
 }
 
 /* Bottom text link */

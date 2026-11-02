@@ -12,11 +12,17 @@
         <h2 class="word">Register</h2>
 
         <form action="{{ url_for('register') }}" method="post">
-            <div>{{ msg }}</div>
+            {% if msg %}
+            <div class="msg">{{ msg }}</div>
+            {% endif %}
 
+            <input class="textbox" type="text" name="full_name" placeholder="Enter Full Name" required>
             <input class="textbox" type="text" name="username" placeholder="Enter Username" required>
             <input class="textbox" type="password" name="password" placeholder="Enter Password" required>
             <input class="textbox" type="email" name="email" placeholder="Enter Email" required>
+            <input class="textbox" type="tel" name="phone" placeholder="Enter Phone Number" required>
+            <input class="textbox" type="text" name="national_id" placeholder="Enter National ID" required>
+            <input class="textbox" type="date" name="birth_Date" placeholder="Enter Birth Date" title="Birth Date" required>
 
             <button class="btn" type="submit">Register</button>
         </form>

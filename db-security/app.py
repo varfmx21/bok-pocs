@@ -1,5 +1,6 @@
 import json
 import os
+import datetime
 from flask import Flask, render_template, request, redirect, url_for, session
 import pyodbc
 import re
@@ -27,6 +28,7 @@ SQL_DATABASE = os.environ.get('SQL_DATABASE', 'login')
 SQL_USER = os.environ.get('SQL_USER')
 SQL_PASSWORD = os.environ.get('SQL_PASSWORD')
 SQL_DRIVER = os.environ.get('SQL_DRIVER', '{ODBC Driver 18 for SQL Server}')
+AZURE_USER_ID = os.environ.get('AZURE_USER_ID')
 
 def get_db_connection():
     connection_string = (
@@ -38,6 +40,8 @@ def get_db_connection():
         "Encrypt=yes;"
         "TrustServerCertificate=no;"
         "Connection Timeout=30;"
+        "ColumnEncryption=KeyVaultInteractive;"
+        f"UID={AZURE_USER_ID};"
     )
     return pyodbc.connect(connection_string)
 
@@ -89,9 +93,29 @@ def login():
             session['loggedin'] = True
             session['id'] = account['id']
             session['username'] = account['username']
-            return render_template('index.html', msg='Logged in successfully!')
+            user_id = account['id']
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT username, email, national_id, phone FROM accounts WHERE id = ?", (user_id,))
+            account_data = row_to_dict(cursor, cursor.fetchone())
+            cursor.close()
+            conn.close()
+
+            return render_template('index.html', msg='Logged in successfully!', account=account_data)
         else:
             msg = 'Incorrect username/password!'
+
+    if 'loggedin' in session:
+        user_id = session.get('id')
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, email, national_id, phone FROM accounts WHERE id = ?", (user_id,))
+        account_data = row_to_dict(cursor, cursor.fetchone())
+        cursor.close()
+        conn.close()
+        return render_template('index.html', account=account_data)
+
     return render_template('login.html', msg=msg)
 
 @app.route('/logout')
@@ -105,9 +129,20 @@ def logout():
 def register():
     msg = ''
     if request.method == 'POST' and 'username' in request.form and 'password' in request.form and 'email' in request.form:
-        username = request.form['username']
-        password = request.form['password']
-        email = request.form['email']
+        username = request.form.get('username')
+        password = request.form.get('password')
+        email = request.form.get('email')
+        full_name = request.form.get('full_name')
+        phone = request.form.get('phone')
+        national_id = request.form.get('national_id')
+        birth_date_raw = request.form.get('birth_Date') or request.form.get('birth_date')
+
+        birth_date = None
+        if birth_date_raw:
+            try:
+                birth_date = datetime.date.fromisoformat(birth_date_raw)
+            except (ValueError, TypeError):
+                birth_date = birth_date_raw
 
         custom_salt = os.urandom(16)
 
@@ -144,16 +179,16 @@ def register():
             msg = 'Invalid email address!'
         elif not re.match(r'[A-Za-z0-9]+', username):
             msg = 'Username must contain only letters and numbers!'
-        elif not username or not password or not email:
+        elif not username or not password or not email or not full_name or not phone or not national_id or not birth_date:
             msg = 'Please fill out the form!'
         else:
             cursor.execute(
                 '''
                 INSERT INTO accounts
-                    (username, password, email, salt, pepper_version, argon2_params)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (username, password, email, salt, pepper_version, argon2_params, full_name, phone, national_id, birth_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''',
-                (username, hmac_hash, email, custom_salt, pepper_version, argon2_params_json)
+                (username, hmac_hash, email, custom_salt, pepper_version, argon2_params_json, full_name, phone, national_id, birth_date)
             )
             conn.commit()
             msg = 'You have successfully registered!'
