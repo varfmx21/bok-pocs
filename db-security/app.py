@@ -7,6 +7,9 @@ import re
 import hmac
 from argon2 import PasswordHasher, Type
 from argon2.exceptions import VerifyMismatchError, InvalidHashError
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ph = PasswordHasher(
     time_cost=3,
@@ -17,7 +20,7 @@ ph = PasswordHasher(
 )
 
 pepper = os.environ.get('PEPPER')
-pepper_version= os.environ.get('PEPPER_VERSION')
+pepper_version = os.environ.get('PEPPER_VERSION')
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY_FLASK')
@@ -28,28 +31,44 @@ SQL_DATABASE = os.environ.get('SQL_DATABASE', 'login')
 SQL_USER = os.environ.get('SQL_USER')
 SQL_PASSWORD = os.environ.get('SQL_PASSWORD')
 SQL_DRIVER = os.environ.get('SQL_DRIVER', '{ODBC Driver 18 for SQL Server}')
-AZURE_USER_ID = os.environ.get('AZURE_USER_ID')
+
 
 def get_db_connection():
+    """
+    Conecta a Azure SQL con Always Encrypted habilitado según la especificación
+    oficial de Microsoft ODBC Driver 18 para cuentas interactivas (MFA / Estudiantes):
+
+    Doc oficial:
+      - ColumnEncryption=Enabled
+      - KeyStoreAuthentication=KeyVaultInteractive
+      - KeyStorePrincipalId y KeyStoreSecret deben dejarse SIN CONFIGURAR (not set)
+
+    El driver ODBC de Windows abre automáticamente la ventana del navegador
+    (o Windows Account Manager - WAM) para autenticar contra Azure Key Vault.
+    """
     connection_string = (
         f"DRIVER={SQL_DRIVER};"
-        f"SERVER={SQL_SERVER};"
+        f"SERVER={SQL_SERVER},1433;"
         f"DATABASE={SQL_DATABASE};"
         f"UID={SQL_USER};"
         f"PWD={SQL_PASSWORD};"
         "Encrypt=yes;"
         "TrustServerCertificate=no;"
         "Connection Timeout=30;"
-        "ColumnEncryption=KeyVaultInteractive;"
-        f"UID={AZURE_USER_ID};"
+        "ColumnEncryption=Enabled;"
+        "KeyStoreAuthentication=KeyVaultInteractive;"
     )
-    return pyodbc.connect(connection_string)
+
+    conn = pyodbc.connect(connection_string)
+    return conn
+
 
 def row_to_dict(cursor, row):
     if not row:
         return None
     columns = [column[0] for column in cursor.description]
     return dict(zip(columns, row))
+
 
 @app.route('/')
 @app.route('/login', methods=['GET', 'POST'])
@@ -61,7 +80,8 @@ def login():
         
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM accounts WHERE username = ?', (username, ))
+        cursor.setinputsizes([(pyodbc.SQL_VARCHAR, 50, 0)])
+        cursor.execute('SELECT id, username, password, salt FROM accounts WHERE username = ?', (username, ))
         account = row_to_dict(cursor, cursor.fetchone())
         cursor.close()
         conn.close()
@@ -118,12 +138,14 @@ def login():
 
     return render_template('login.html', msg=msg)
 
+
 @app.route('/logout')
 def logout():
     session.pop('loggedin', None)
     session.pop('id', None)
     session.pop('username', None)
     return redirect(url_for('login'))
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -168,8 +190,9 @@ def register():
 
         conn = get_db_connection()
         cursor = conn.cursor()
+        cursor.setinputsizes([(pyodbc.SQL_VARCHAR, 50, 0), (pyodbc.SQL_VARCHAR, 100, 0)])
         cursor.execute(
-            'SELECT * FROM accounts WHERE username = ? OR email = ?',
+            'SELECT id, username, email FROM accounts WHERE username = ? OR email = ?',
             (username, email)
         )
         account = row_to_dict(cursor, cursor.fetchone())
@@ -182,6 +205,18 @@ def register():
         elif not username or not password or not email or not full_name or not phone or not national_id or not birth_date:
             msg = 'Please fill out the form!'
         else:
+            cursor.setinputsizes([
+                (pyodbc.SQL_VARCHAR, 50, 0),    # username
+                (pyodbc.SQL_VARCHAR, 255, 0),   # password
+                (pyodbc.SQL_VARCHAR, 100, 0),   # email
+                (pyodbc.SQL_VARBINARY, 16, 0),  # salt
+                pyodbc.SQL_INTEGER,             # pepper_version
+                (pyodbc.SQL_WVARCHAR, 0, 0),    # argon2_params (NVARCHAR)
+                (pyodbc.SQL_WVARCHAR, 100, 0),  # full_name (NVARCHAR)
+                (pyodbc.SQL_VARCHAR, 20, 0),    # phone
+                (pyodbc.SQL_VARCHAR, 30, 0),    # national_id
+                pyodbc.SQL_TYPE_DATE            # birth_date
+            ])
             cursor.execute(
                 '''
                 INSERT INTO accounts
@@ -196,5 +231,6 @@ def register():
         conn.close()
     return render_template('register.html', msg=msg)
 
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False, threaded=False)
