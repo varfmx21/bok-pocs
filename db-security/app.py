@@ -9,8 +9,6 @@ from argon2 import PasswordHasher, Type
 from argon2.exceptions import VerifyMismatchError, InvalidHashError
 from dotenv import load_dotenv
 
-load_dotenv()
-
 ph = PasswordHasher(
     time_cost=3,
     memory_cost=65536,
@@ -25,50 +23,15 @@ pepper_version = os.environ.get('PEPPER_VERSION')
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY_FLASK')
 
-# Configuración SQL Server (Azure SQL)
-SQL_SERVER = os.environ.get('SQL_SERVER')
-SQL_DATABASE = os.environ.get('SQL_DATABASE', 'login')
-SQL_USER = os.environ.get('SQL_USER')
-SQL_PASSWORD = os.environ.get('SQL_PASSWORD')
-SQL_DRIVER = os.environ.get('SQL_DRIVER', '{ODBC Driver 18 for SQL Server}')
-
-
 def get_db_connection():
-    """
-    Conecta a Azure SQL con Always Encrypted habilitado según la especificación
-    oficial de Microsoft ODBC Driver 18 para cuentas interactivas (MFA / Estudiantes):
-
-    Doc oficial:
-      - ColumnEncryption=Enabled
-      - KeyStoreAuthentication=KeyVaultInteractive
-      - KeyStorePrincipalId y KeyStoreSecret deben dejarse SIN CONFIGURAR (not set)
-
-    El driver ODBC de Windows abre automáticamente la ventana del navegador
-    (o Windows Account Manager - WAM) para autenticar contra Azure Key Vault.
-    """
-    connection_string = (
-        f"DRIVER={SQL_DRIVER};"
-        f"SERVER={SQL_SERVER},1433;"
-        f"DATABASE={SQL_DATABASE};"
-        f"UID={SQL_USER};"
-        f"PWD={SQL_PASSWORD};"
-        "Encrypt=yes;"
-        "TrustServerCertificate=no;"
-        "Connection Timeout=30;"
-        "ColumnEncryption=Enabled;"
-        "KeyStoreAuthentication=KeyVaultInteractive;"
-    )
-
-    conn = pyodbc.connect(connection_string)
-    return conn
-
+    connection_string = (os.environ.get('AZURE_SQL_CONNECTIONSTRING'))
+    return pyodbc.connect(connection_string)
 
 def row_to_dict(cursor, row):
     if not row:
         return None
     columns = [column[0] for column in cursor.description]
     return dict(zip(columns, row))
-
 
 @app.route('/')
 @app.route('/login', methods=['GET', 'POST'])
@@ -77,16 +40,16 @@ def login():
     if request.method == 'POST' and 'username' in request.form and 'password' in request.form:
         username = request.form['username']
         password = request.form['password']
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.setinputsizes([(pyodbc.SQL_VARCHAR, 50, 0)])
-        cursor.execute('SELECT id, username, password, salt FROM accounts WHERE username = ?', (username, ))
+        cursor.execute('SELECT id, username, password, salt FROM accounts WHERE username = ?', (username,))
         account = row_to_dict(cursor, cursor.fetchone())
         cursor.close()
         conn.close()
 
-        login = False
+        login_success = False
         try:
             if account:
                 possible_argon2id_hash_raw = ph.hash(
@@ -101,15 +64,15 @@ def login():
                 ).hexdigest()
 
                 if hmac.compare_digest(possible_hmac_hash, account['password']):
-                    login = True
-                    print("Login successful for user:", username)
+                    login_success = True
+                    print(f"Login successful for user: {username}")
                 else:
-                    login = False
-                    print("Login failed for user:", username, "- Incorrect password.")
+                    login_success = False
+                    print(f"Login failed for user: {username} - Incorrect password.")
         except (VerifyMismatchError, InvalidHashError):
-            login = False
+            login_success = False
 
-        if login and account:
+        if login_success and account:
             session['loggedin'] = True
             session['id'] = account['id']
             session['username'] = account['username']
@@ -158,7 +121,6 @@ def register():
         phone = request.form.get('phone')
         national_id = request.form.get('national_id')
         birth_date_raw = request.form.get('birth_Date') or request.form.get('birth_date')
-
         birth_date = None
         if birth_date_raw:
             try:
@@ -179,7 +141,7 @@ def register():
             digestmod='sha256'
         ).hexdigest()
 
-        argon2_config = {   
+        argon2_config = {
             "t": ph.time_cost,
             "m": ph.memory_cost,
             "p": ph.parallelism,
@@ -196,6 +158,7 @@ def register():
             (username, email)
         )
         account = row_to_dict(cursor, cursor.fetchone())
+
         if account:
             msg = 'Account already exists!'
         elif not re.match(r'[^@]+@[^@]+\.[^@]+', email):
@@ -211,11 +174,11 @@ def register():
                 (pyodbc.SQL_VARCHAR, 100, 0),   # email
                 (pyodbc.SQL_VARBINARY, 16, 0),  # salt
                 pyodbc.SQL_INTEGER,             # pepper_version
-                (pyodbc.SQL_WVARCHAR, 0, 0),    # argon2_params (NVARCHAR)
-                (pyodbc.SQL_WVARCHAR, 100, 0),  # full_name (NVARCHAR)
-                (pyodbc.SQL_VARCHAR, 20, 0),    # phone
-                (pyodbc.SQL_VARCHAR, 30, 0),    # national_id
-                pyodbc.SQL_TYPE_DATE            # birth_date
+                (pyodbc.SQL_WVARCHAR, 0, 0),    # argon2_params
+                (pyodbc.SQL_WVARCHAR, 100, 0),  # full_name (Always Encrypted)
+                (pyodbc.SQL_VARCHAR, 20, 0),    # phone (Always Encrypted)
+                (pyodbc.SQL_VARCHAR, 30, 0),    # national_id (Always Encrypted)
+                pyodbc.SQL_TYPE_DATE            # birth_date (Always Encrypted)
             ])
             cursor.execute(
                 '''
@@ -227,8 +190,10 @@ def register():
             )
             conn.commit()
             msg = 'You have successfully registered!'
+
         cursor.close()
         conn.close()
+
     return render_template('register.html', msg=msg)
 
 

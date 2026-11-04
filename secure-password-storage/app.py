@@ -16,7 +16,6 @@ ph = PasswordHasher(
     type=Type.ID
 )
 
-custom_salt = os.urandom(16)
 pepper = os.environ.get('PEPPER')
 pepper_version= os.environ.get('PEPPER_VERSION')
 
@@ -86,6 +85,8 @@ def register():
         username = request.form['username']
         password = request.form['password']
         email = request.form['email']
+
+        custom_salt = os.urandom(16)
 
         argon2id_hash_raw = ph.hash(
             password,
