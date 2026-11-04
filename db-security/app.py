@@ -9,6 +9,8 @@ from argon2 import PasswordHasher, Type
 from argon2.exceptions import VerifyMismatchError, InvalidHashError
 from dotenv import load_dotenv
 
+load_dotenv()
+
 ph = PasswordHasher(
     time_cost=3,
     memory_cost=65536,
@@ -152,7 +154,10 @@ def register():
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.setinputsizes([(pyodbc.SQL_VARCHAR, 50, 0), (pyodbc.SQL_VARCHAR, 100, 0)])
+        cursor.setinputsizes(
+            [(pyodbc.SQL_VARCHAR, 50, 0), 
+             (pyodbc.SQL_VARCHAR, 100, 0)]
+        )
         cursor.execute(
             'SELECT id, username, email FROM accounts WHERE username = ? OR email = ?',
             (username, email)

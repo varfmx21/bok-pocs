@@ -8,6 +8,7 @@ import hmac
 from argon2 import PasswordHasher, Type
 from argon2.exceptions import VerifyMismatchError, InvalidHashError
 
+
 ph = PasswordHasher(
     time_cost=3,
     memory_cost=65536,
